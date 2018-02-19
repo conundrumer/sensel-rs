@@ -1,6 +1,10 @@
 [package]
-name = "sensel-midi"
+name = "sensel-rust"
 version = "0.1.0"
 authors = ["delu <davidelu93@gmail.com>"]
 
 [dependencies]
+
+[build-dependencies]
+bindgen = "0.33.1"
+cc = "1.0"
