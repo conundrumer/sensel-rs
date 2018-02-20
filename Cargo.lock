@@ -246,7 +246,7 @@ version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "sensel-rust"
+name = "sensel"
 version = "0.1.0"
 dependencies = [
  "bindgen 0.33.1 (registry+https://github.com/rust-lang/crates.io-index)",
