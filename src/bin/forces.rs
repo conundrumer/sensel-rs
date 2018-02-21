@@ -6,19 +6,14 @@ use std::io::stdin;
 use std::thread::spawn;
 use std::sync::mpsc::channel;
 
-static CONTACT_STATE_STRING: [&'static str; 4] = [
-    "CONTACT_INVALID",
-    "CONTACT_START",
-    "CONTACT_MOVE",
-    "CONTACT_END"
-];
-
 fn main() {
     unsafe {
         //Handle that references a Sensel device
         let mut handle = zeroed();
         //List of all available Sensel devices
         let mut list = zeroed();
+        //Sensor info from the Sensel device
+        let mut sensor_info = zeroed();
         //SenselFrame data that will hold the contacts
         let mut frame = zeroed();
 
@@ -34,9 +29,11 @@ fn main() {
 
         //Open a Sensel device by the id in the SenselDeviceList, handle initialized
         senselOpenDeviceByID(&mut handle, list.devices[0].idx);
+        //Get the sensor info
+        senselGetSensorInfo(handle, &mut sensor_info);
 
         //Set the frame content to scan contact data
-        senselSetFrameContent(handle, FRAME_CONTENT_CONTACTS_MASK as u8);
+        senselSetFrameContent(handle, FRAME_CONTENT_PRESSURE_MASK as u8);
         //Allocate a frame of data, must be done before reading frame data
         senselAllocateFrameData(handle, &mut frame);
         //Start scanning the Sensel device
@@ -60,25 +57,13 @@ fn main() {
                 //Read one frame of data
                 senselGetFrame(handle, frame);
                 let frame = *frame;
-                //Print out contact data
-                if frame.n_contacts > 0 {
-                    println!("Num Contacts: {}", frame.n_contacts);
-                    for c in 0..frame.n_contacts {
-                        let contact = *frame.contacts.offset(c as isize);
-                        let state = contact.state;
-                        println!("Contact ID: {} State: {}", contact.id, CONTACT_STATE_STRING[state as usize]);
-
-                        //Turn on LED for CONTACT_START
-                        if state == SenselContactState_CONTACT_START {
-                            senselSetLEDBrightness(handle, contact.id, 100);
-                        }
-                        //Turn off LED for CONTACT_END
-                        else if state == SenselContactState_CONTACT_END {
-                            senselSetLEDBrightness(handle, contact.id, 0);
-                        }
-                    }
-                    println!();
+                //Calculate the total force
+                let mut total_force = 0.0;
+                for i in 0..sensor_info.num_cols*sensor_info.num_rows {
+                    let force = *frame.force_array.offset(i as isize);
+                    total_force = total_force + force;
                 }
+                println!("Total Force : {}", total_force);
             }
         }
     }

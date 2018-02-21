@@ -5,35 +5,49 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
-    let target = env::var("TARGET").expect("TARGET was not set");
-
-    cc::Build::new()
-        .include("vendor/sensel-api/sensel-lib/src")
-        .file("vendor/sensel-api/sensel-lib/src/sensel.c")
-        .file("vendor/sensel-api/sensel-lib/src/sensel_register.c")
-        .file(if target.contains("windows") {
-            "vendor/sensel-api/sensel-lib/src/sensel_serial_win.c"
-        } else {
-            "vendor/sensel-api/sensel-lib/src/sensel_serial_linux.c"
-        })
-        .flag("-w") // the code causes warnings so suppress them
-        .compile("sensel");
-
-    // The bindgen::Builder is the main entry point
-    // to bindgen, and lets you build up options for
-    // the resulting bindings.
+    // generate bindings
     let bindings = bindgen::Builder::default()
-        // The input header we would like to generate
-        // bindings for.
-        .header("wrapper.h")
-        // Finish the builder and generate the bindings.
+        .header("vendor/sensel-api/sensel-lib/src/sensel.h")
         .generate()
-        // Unwrap the Result and panic on failure.
         .expect("Unable to generate bindings");
 
-    // Write the bindings to the $OUT_DIR/bindings.rs file.
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     bindings
         .write_to_file(out_path.join("bindings.rs"))
         .expect("Couldn't write bindings!");
+
+    // link to LibSensel
+    if cfg!(feature = "forces") {
+        // link to existing installation
+        // this only works if host == target
+        if cfg!(target_os = "windows") && cfg!(target_arch = "x86") {
+            println!(r"cargo:rustc-link-search=C:\Program Files\Sensel\SenselLib\x86");
+        } else if cfg!(target_os = "windows") && cfg!(target_arch = "x86_64") {
+            println!(r"cargo:rustc-link-search=C:\Program Files\Sensel\SenselLib\x64");
+        } else if (cfg!(target_os = "macos") && cfg!(target_arch = "x86_64")) ||
+            (cfg!(target_os = "linux") && (
+                cfg!(target_arch = "x86_64") ||
+                cfg!(target_arch = "x86") ||
+                cfg!(target_arch = "arm")
+            ))
+        {
+            // LibSensel for macos (/usr/local/lib) and linux (/usr/lib) should already be in the path
+        } else {
+            unimplemented!("forces not available for target")
+        }
+        println!(r"cargo:rustc-link-lib=sensel");
+    } else {
+        // compile LibSensel
+        cc::Build::new()
+            .include("vendor/sensel-api/sensel-lib/src")
+            .file("vendor/sensel-api/sensel-lib/src/sensel.c")
+            .file("vendor/sensel-api/sensel-lib/src/sensel_register.c")
+            .file(if cfg!(target_os = "windows") {
+                "vendor/sensel-api/sensel-lib/src/sensel_serial_win.c"
+            } else {
+                "vendor/sensel-api/sensel-lib/src/sensel_serial_linux.c"
+            })
+            .flag("-w") // the code causes warnings so suppress them
+            .compile("sensel");
+    }
 }

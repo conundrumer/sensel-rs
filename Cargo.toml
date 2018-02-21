@@ -8,3 +8,7 @@ authors = ["delu <davidelu93@gmail.com>"]
 [build-dependencies]
 bindgen = "0.33.1"
 cc = "1.0"
+
+[features]
+# force frame functionality, requires installing LibSensel from the packages in sensel-install
+forces = []
