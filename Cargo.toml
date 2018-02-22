@@ -1,14 +1,14 @@
 [package]
+authors = ["delu <davidelu93@gmail.com>"]
 name = "sensel"
 version = "0.1.0"
-authors = ["delu <davidelu93@gmail.com>"]
-
-[dependencies]
 
 [build-dependencies]
 bindgen = "0.33.1"
 cc = "1.0"
 
+[dependencies]
+bitflags = "1.0.1"
+
 [features]
-# force frame functionality, requires installing LibSensel from the packages in sensel-install
 forces = []

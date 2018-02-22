@@ -1,84 +1,63 @@
 extern crate sensel;
 
-use sensel::*;
-use std::mem::zeroed;
 use std::io::stdin;
 use std::thread::spawn;
 use std::sync::mpsc::channel;
 
-static CONTACT_STATE_STRING: [&'static str; 4] = [
-    "CONTACT_INVALID",
-    "CONTACT_START",
-    "CONTACT_MOVE",
-    "CONTACT_END"
-];
-
 fn main() {
-    unsafe {
-        //Handle that references a Sensel device
-        let mut handle = zeroed();
-        //List of all available Sensel devices
-        let mut list = zeroed();
-        //SenselFrame data that will hold the contacts
-        let mut frame = zeroed();
+    let list = sensel::device::get_device_list().unwrap();
 
-        //Get a list of avaialble Sensel devices
-        senselGetDeviceList(&mut list);
-        if list.num_devices == 0 {
-            println!("No device found");
-            println!("Press Enter to exit example");
-            let mut input = String::new();
-            stdin().read_line(&mut input).unwrap();
-            return;
-        }
+    let list_slice = list.as_slice();
 
-        //Open a Sensel device by the id in the SenselDeviceList, handle initialized
-        senselOpenDeviceByID(&mut handle, list.devices[0].idx);
-
-        //Set the frame content to scan contact data
-        senselSetFrameContent(handle, FRAME_CONTENT_CONTACTS_MASK as u8);
-        //Allocate a frame of data, must be done before reading frame data
-        senselAllocateFrameData(handle, &mut frame);
-        //Start scanning the Sensel device
-        senselStartScanning(handle);
-
+    if list_slice.len() == 0 {
+        println!("No device found");
         println!("Press Enter to exit example");
-        let (sender, receiver) = channel();
-        spawn(move || {
-            let mut input = String::new();
-            stdin().read_line(&mut input).unwrap();
-            sender.send(()).unwrap();
-        });
+        let mut input = String::new();
+        stdin().read_line(&mut input).unwrap();
+        return;
+    }
 
-        while receiver.try_recv().is_err() {
-            let mut num_frames = 0;
-            //Read all available data from the Sensel device
-            senselReadSensor(handle);
-            //Get number of frames available in the data read from the sensor
-            senselGetNumAvailableFrames(handle, &mut num_frames);
-            for _ in 0..num_frames {
-                //Read one frame of data
-                senselGetFrame(handle, frame);
-                let frame = *frame;
-                //Print out contact data
-                if frame.n_contacts > 0 {
-                    println!("Num Contacts: {}", frame.n_contacts);
-                    for c in 0..frame.n_contacts {
-                        let contact = *frame.contacts.offset(c as isize);
-                        let state = contact.state;
-                        println!("Contact ID: {} State: {}", contact.id, CONTACT_STATE_STRING[state as usize]);
+    let device = list_slice[0].open().unwrap();
 
-                        //Turn on LED for CONTACT_START
-                        if state == SenselContactState_CONTACT_START {
-                            senselSetLEDBrightness(handle, contact.id, 100);
-                        }
-                        //Turn off LED for CONTACT_END
-                        else if state == SenselContactState_CONTACT_END {
-                            senselSetLEDBrightness(handle, contact.id, 0);
-                        }
-                    }
-                    println!();
+    device.set_frame_content(sensel::frame::Mask::CONTACTS).unwrap();
+
+    device.start_scanning().unwrap();
+
+    println!("Press Enter to exit example");
+    let (sender, receiver) = channel();
+    spawn(move || {
+        let mut input = String::new();
+        stdin().read_line(&mut input).unwrap();
+        sender.send(()).unwrap();
+    });
+
+    while receiver.try_recv().is_err() {
+        device.read_sensor().unwrap();
+
+        let num_frames = device.get_num_available_frames().unwrap();
+
+        for _ in 0..num_frames {
+            let frame = device.get_frame().unwrap();
+
+            let contacts = frame.contacts.unwrap();
+
+            if contacts.len() > 0 {
+                println!("Num Contacts: {}", contacts.len());
+                for &contact in contacts {
+                    let contact = sensel::contact::Contact::from(contact);
+                    println!("Contact ID: {} State: {:?}", contact.id, contact.state);
+
+                    match contact.state {
+                        sensel::contact::State::CONTACT_START => {
+                            device.set_led_brightness(contact.id, 100).unwrap();
+                        },
+                        sensel::contact::State::CONTACT_END => {
+                            device.set_led_brightness(contact.id, 0).unwrap();
+                        },
+                        _ => {}
+                    };
                 }
+                println!();
             }
         }
     }

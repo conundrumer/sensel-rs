@@ -1,5 +1,10 @@
-#![allow(non_upper_case_globals)]
-#![allow(non_camel_case_types)]
-#![allow(non_snake_case)]
+#[macro_use]
+extern crate bitflags;
 
-include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+mod bindings;
+mod result;
+pub mod device;
+pub mod frame;
+pub mod contact;
+
+pub use result::SenselError;
