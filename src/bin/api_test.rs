@@ -35,66 +35,59 @@ fn run() -> Result<bool, sensel::SenselError> {
     println!("max_led_brightness: {}", device.max_led_brightness);
     println!("supported frame content: {:?}", device.supported_frame_content);
 
-    thread::sleep(time::Duration::from_millis(1000));
+    // thread::sleep(time::Duration::from_millis(1000));
 
     let pressed = device.get_power_button_pressed()?;
     println!("power_button_pressed: {}", pressed);
 
-    device.set_led_brightness(0, 100)?;
-    assert!(device.get_led_brightness(0)? == 100);
+    let tests: Vec<Box<Fn() -> Result<_, _>>> = vec![Box::new(|| {
+        device.set_led_brightness(0, 100)?;
+        assert!(device.get_led_brightness(0)? == 100);
+        Ok(())
+    }), Box::new(|| {
+        device.set_scan_mode(sensel::scan_mode::SCAN_MODE_ASYNC)?;
+        assert!(device.get_scan_mode()? == sensel::scan_mode::SCAN_MODE_ASYNC);
+        Ok(())
+    }), Box::new(|| {
+        device.set_scan_detail(sensel::scan_detail::SCAN_DETAIL_LOW)?;
+        assert!(device.get_scan_detail()? == sensel::scan_detail::SCAN_DETAIL_LOW);
+        Ok(())
+    }), Box::new(|| {
+        device.set_buffer_control(42)?;
+        assert!(device.get_buffer_control()? == 42);
+        Ok(())
+    }), Box::new(|| {
+        device.set_max_frame_rate(42)?;
+        assert!(device.get_max_frame_rate()? == 42);
+        Ok(())
+    }), Box::new(|| {
+        device.set_frame_content(sensel::frame::Mask::ACCEL)?;
+        assert!(device.get_frame_content()? == sensel::frame::Mask::ACCEL);
+        Ok(())
+    }), Box::new(|| {
+        device.set_contacts_mask(sensel::contact::Mask::PEAK)?;
+        assert!(device.get_contacts_mask()? == sensel::contact::Mask::PEAK);
+        Ok(())
+    }), Box::new(|| {
+        device.set_contacts_min_force(42)?;
+        assert!(device.get_contacts_min_force()? == 42);
+        Ok(())
+    }), Box::new(|| {
+        device.set_contacts_enable_blob_merge(false)?;
+        assert!(device.get_contacts_enable_blob_merge()? == false);
+        Ok(())
+    }), Box::new(|| {
+        device.set_dynamic_baseline_enabled(false)?;
+        assert!(device.get_dynamic_baseline_enabled()? == false);
+        Ok(())
+    })];
+
+    for (i, test) in tests.iter().enumerate() {
+        test()?;
+        device.set_led_brightness(i as u8, 100)?;
+    }
 
     device.soft_reset()?;
-
-    device.set_scan_mode(sensel::scan_mode::SCAN_MODE_ASYNC)?;
-    assert!(device.get_scan_mode()? == sensel::scan_mode::SCAN_MODE_ASYNC);
-
-    device.soft_reset()?;
-
-    device.set_scan_detail(sensel::scan_detail::SCAN_DETAIL_LOW)?;
-    assert!(device.get_scan_detail()? == sensel::scan_detail::SCAN_DETAIL_LOW);
-
-    device.soft_reset()?;
-
-    device.set_buffer_control(42)?;
-    assert!(device.get_buffer_control()? == 42);
-
-    device.soft_reset()?;
-
-    device.set_max_frame_rate(42)?;
-    assert!(device.get_max_frame_rate()? == 42);
-
-    device.soft_reset()?;
-
-    device.set_frame_content(sensel::frame::Mask::ACCEL)?;
-    assert!(device.get_frame_content()? == sensel::frame::Mask::ACCEL);
-
-    device.soft_reset()?;
-
-    device.set_contacts_mask(sensel::contact::Mask::PEAK)?;
-    assert!(device.get_contacts_mask()? == sensel::contact::Mask::PEAK);
-
-    device.soft_reset()?;
-
-    device.set_contacts_min_force(42)?;
-    assert!(device.get_contacts_min_force()? == 42);
-
-    device.soft_reset()?;
-
-    device.set_contacts_enable_blob_merge(false)?;
-    assert!(device.get_contacts_enable_blob_merge()? == false);
-
-    device.soft_reset()?;
-
-    device.set_dynamic_baseline_enabled(false)?;
-    assert!(device.get_dynamic_baseline_enabled()? == false);
-
-    device.soft_reset()?;
-
-    // device.write_reg()?;
-    // device.read_reg()?;
-
-    // device.write_reg_vs()?;
-    // device.read_reg_vs()?;
 
     device.start_scanning()?; // TODO: make sensor struct
 
@@ -108,6 +101,10 @@ fn run() -> Result<bool, sensel::SenselError> {
     }
 
     device.stop_scanning()?; // TODO: consume sensor struct
+
+    for i in 0..device.num_leds {
+        device.set_led_brightness(i, 0)?;
+    }
 
     // implicitly closed when dropped
     // device.close();
