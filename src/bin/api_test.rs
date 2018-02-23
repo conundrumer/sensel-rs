@@ -87,7 +87,11 @@ fn run() -> Result<bool, sensel::SenselError> {
         device.set_led_brightness(i as u8, 100)?;
     }
 
+    device.set_led_array(&vec![100; device.num_leds])?;
+
     device.soft_reset()?;
+
+    device.set_frame_content(sensel::frame::Mask::CONTACTS | sensel::frame::Mask::ACCEL)?;
 
     device.start_scanning()?; // TODO: make sensor struct
 
@@ -102,9 +106,7 @@ fn run() -> Result<bool, sensel::SenselError> {
 
     device.stop_scanning()?; // TODO: consume sensor struct
 
-    for i in 0..device.num_leds {
-        device.set_led_brightness(i, 0)?;
-    }
+    device.set_led_array(&vec![0; device.num_leds])?;
 
     // implicitly closed when dropped
     // device.close();

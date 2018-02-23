@@ -8,6 +8,7 @@ fn main() {
     // generate bindings
     let bindings = bindgen::Builder::default()
         .header("vendor/sensel-api/sensel-lib/src/sensel.h")
+        .header("vendor/sensel-api/sensel-lib/src/sensel_register_map.h")
         .rustified_enum(".*")
         .generate()
         .expect("Unable to generate bindings");

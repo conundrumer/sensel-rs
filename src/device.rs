@@ -1,7 +1,15 @@
+use std::mem;
+use std::cell::RefCell;
+
 use bindings::*;
 use result::*;
 use frame;
 use contact;
+
+enum LEDArray {
+    Char(Vec<u8>),
+    Short(Vec<u16>),
+}
 
 pub struct DeviceList(SenselDeviceList);
 
@@ -11,14 +19,15 @@ pub struct Device {
     pub id: SenselDeviceID,
     pub sensor_info: SenselSensorInfo,
     pub fw_info: SenselFirmwareInfo,
-    pub num_leds: u8,
+    pub supported_frame_content: frame::Mask,
+    pub num_leds: usize,
     pub max_led_brightness: u16,
-    pub supported_frame_content: frame::Mask
+    led_array_buf: RefCell<LEDArray>
 }
 
 pub fn get_device_list() -> Result<DeviceList, SenselError> {
     unsafe {
-        let mut list = ::std::mem::zeroed();
+        let mut list = mem::zeroed();
         sensel_result(senselGetDeviceList(&mut list))
             .and(Ok(list.into()))
     }
@@ -51,20 +60,22 @@ impl SenselDeviceID {
     }
     pub fn open(self) -> Result<Device, SenselError> {
         unsafe {
-            let mut handle = ::std::mem::zeroed();
-            let mut fw_info = ::std::mem::zeroed();
-            let mut sensor_info = ::std::mem::zeroed();
-            let mut frame_data = ::std::mem::zeroed();
-            let mut num_leds = ::std::mem::zeroed();
-            let mut max_led_brightness = ::std::mem::zeroed();
-            let mut supported_frame_content = ::std::mem::zeroed();
+            let mut handle = mem::zeroed();
+            let mut fw_info = mem::zeroed();
+            let mut sensor_info = mem::zeroed();
+            let mut frame_data = mem::zeroed();
+            let mut supported_frame_content = 0;
+            let mut num_leds = 0;
+            let mut max_led_brightness = 0;
+            let mut led_reg_size = 0;
 
             sensel_result(senselOpenDeviceByID(&mut handle, self.idx))
                 .and_then(|_| sensel_result(senselGetFirmwareInfo(handle, &mut fw_info)))
                 .and_then(|_| sensel_result(senselGetSensorInfo(handle, &mut sensor_info)))
+                .and_then(|_| sensel_result(senselGetSupportedFrameContent(handle, &mut supported_frame_content)))
                 .and_then(|_| sensel_result(senselGetNumAvailableLEDs(handle, &mut num_leds)))
                 .and_then(|_| sensel_result(senselGetMaxLEDBrightness(handle, &mut max_led_brightness)))
-                .and_then(|_| sensel_result(senselGetSupportedFrameContent(handle, &mut supported_frame_content)))
+                .and_then(|_| sensel_result(senselReadReg(handle, SENSEL_REG_LED_BRIGHTNESS_SIZE as u8, SENSEL_REG_SIZE_LED_BRIGHTNESS_SIZE as u8, &mut led_reg_size)))
                 .and_then(|_| sensel_result(senselAllocateFrameData(handle, &mut frame_data)))
                 .and(Ok(Device {
                     handle,
@@ -72,9 +83,14 @@ impl SenselDeviceID {
                     id: self,
                     sensor_info,
                     fw_info,
-                    num_leds,
+                    supported_frame_content: frame::Mask::from_bits_truncate(supported_frame_content),
+                    num_leds: num_leds as usize,
                     max_led_brightness,
-                    supported_frame_content: frame::Mask::from_bits_truncate(supported_frame_content)
+                    led_array_buf: RefCell::new(match led_reg_size {
+                        1 => LEDArray::Char(vec![0; num_leds as usize]),
+                        2 => LEDArray::Short(vec![0; num_leds as usize]),
+                        _ => unimplemented!()
+                    })
                 }))
         }
     }
@@ -92,6 +108,33 @@ impl Device {
         unsafe {
             sensel_result(senselGetPowerButtonPressed(self.handle, &mut pressed))
                 .and(Ok(pressed != 0))
+        }
+    }
+
+    pub fn set_led_array(&self, led_array: &[u16]) -> Result<(), SenselError> {
+        if led_array.len() != self.num_leds as usize {
+            Err(SenselError)
+        } else if led_array.iter().any(|&brightness| brightness > self.max_led_brightness) {
+            Err(SenselError)
+        } else {
+            let (buf_ptr, buf_size) = match *self.led_array_buf.borrow_mut() {
+                LEDArray::Char(ref mut buf) => {
+                    for (buf, led) in buf.iter_mut().zip(led_array) {
+                        *buf = *led as u8;
+                    }
+                    (buf.as_mut_ptr(), buf.len())
+                },
+                LEDArray::Short(ref mut buf) => {
+                    buf.copy_from_slice(led_array);
+                    (buf.as_mut_ptr() as *mut u8, buf.len())
+                }
+                _ => unimplemented!()
+            };
+            unsafe {
+                let write_size = mem::zeroed();
+                sensel_result(senselWriteRegVS(self.handle, SENSEL_REG_LED_BRIGHTNESS as u8, buf_size as u32, buf_ptr, write_size))
+                    .and(Ok(()))
+            }
         }
     }
 
