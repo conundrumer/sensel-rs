@@ -9,7 +9,6 @@ pub mod contact;
 
 pub use result::SenselError;
 
-
 pub const MAX_DEVICES: usize = bindings::SENSEL_MAX_DEVICES as usize;
 
 pub mod scan_mode {

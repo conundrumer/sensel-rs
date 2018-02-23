@@ -102,7 +102,8 @@ fn run() -> Result<bool, sensel::SenselError> {
 
     for _ in 0..num_frames {
         let frame = scanning_device.get_frame()?;
-        println!("{:?}", frame)
+        println!("{:?}", frame);
+        println!("num contacts: {}", frame.get_contacts().unwrap().len());
     }
 
     scanning_device.set_led_array(&vec![0; scanning_device.get_info().num_leds])?;

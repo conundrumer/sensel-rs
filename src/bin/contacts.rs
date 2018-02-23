@@ -41,12 +41,11 @@ fn main() {
         for _ in 0..num_frames {
             let frame = device.get_frame().unwrap();
 
-            let contacts = frame.contacts.unwrap();
+            let contacts = frame.get_contacts().unwrap();
 
             if contacts.len() > 0 {
                 println!("Num Contacts: {}", contacts.len());
-                for &contact in contacts {
-                    let contact = sensel::contact::Contact::from(contact);
+                for contact in contacts {
                     println!("Contact ID: {} State: {:?}", contact.id, contact.state);
 
                     match contact.state {

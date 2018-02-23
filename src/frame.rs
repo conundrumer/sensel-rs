@@ -1,6 +1,8 @@
-use std;
+use std::iter;
+use std::slice;
 
 use bindings::*;
+use contact::Contact;
 
 bitflags! {
     pub struct Mask: u8 {
@@ -16,12 +18,22 @@ bitflags! {
 #[derive(Clone, Copy, Debug)]
 pub struct Frame<'a> {
     pub lost_frame_count: i32,
-    pub contacts: Option<&'a [SenselContact]>,
+    contacts: Option<&'a [SenselContact]>,
     #[cfg(feature = "forces")]
     pub force_array: Option<&'a [f32]>,
     #[cfg(feature = "forces")]
     pub labels_array: Option<&'a [u8]>,
     pub accel_data: Option<SenselAccelData>
+}
+
+
+type MapContact = fn(&SenselContact) -> Contact;
+fn map_contact (&c: &SenselContact) -> Contact { c.into() }
+
+impl <'a> Frame<'a> {
+    pub fn get_contacts(&self) -> Option<iter::Map<slice::Iter<SenselContact>, MapContact>> {
+        self.contacts.map(|contacts| contacts.iter().map(map_contact as MapContact))
+    }
 }
 
 pub(crate) fn from_frame_data<'a>(data: SenselFrameData, sensor: SenselSensorInfo) -> Frame<'a> {
@@ -42,7 +54,7 @@ pub(crate) fn from_frame_data<'a>(data: SenselFrameData, sensor: SenselSensorInf
 
     let contacts = if mask.contains(Mask::CONTACTS) {
         unsafe {
-            Some(std::slice::from_raw_parts(contacts, n_contacts as usize))
+            Some(slice::from_raw_parts(contacts, n_contacts as usize))
         }
     } else {
         None
@@ -54,7 +66,7 @@ pub(crate) fn from_frame_data<'a>(data: SenselFrameData, sensor: SenselSensorInf
     #[cfg(feature = "forces")]
     let force_array = if mask.contains(Mask::PRESSURE) {
         unsafe {
-            Some(std::slice::from_raw_parts(force_array, sensor.get_num_sensors()))
+            Some(slice::from_raw_parts(force_array, sensor.get_num_sensors()))
         }
     } else {
         None
@@ -63,7 +75,7 @@ pub(crate) fn from_frame_data<'a>(data: SenselFrameData, sensor: SenselSensorInf
     #[cfg(feature = "forces")]
     let labels_array = if mask.contains(Mask::LABELS) {
         unsafe {
-            Some(std::slice::from_raw_parts(labels_array, sensor.get_num_sensors()))
+            Some(slice::from_raw_parts(labels_array, sensor.get_num_sensors()))
         }
     } else {
         None
