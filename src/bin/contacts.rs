@@ -4,8 +4,6 @@ use std::io::stdin;
 use std::thread::spawn;
 use std::sync::mpsc::channel;
 
-use sensel::device::Device;
-
 fn main() {
     let list = sensel::device::get_device_list().unwrap();
 
@@ -23,7 +21,7 @@ fn main() {
 
     device.set_frame_content(sensel::frame::Mask::CONTACTS).unwrap();
 
-    let device = device.start_scanning().unwrap();
+    let device = device.start_scanning().map_err(|(err, _)| err).unwrap();
 
     println!("Press Enter to exit example");
     let (sender, receiver) = channel();

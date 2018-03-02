@@ -1,7 +1,6 @@
 extern crate sensel;
 
 use std::{thread, time};
-use sensel::device::Device;
 
 fn main() {
     loop {
@@ -94,7 +93,7 @@ fn run() -> Result<bool, sensel::SenselError> {
 
     device.set_frame_content(sensel::frame::Mask::CONTACTS | sensel::frame::Mask::ACCEL)?;
 
-    let scanning_device = device.start_scanning()?;
+    let scanning_device = device.start_scanning().map_err(|(err, _)| err)?;
 
     scanning_device.read_sensor()?;
 
@@ -108,7 +107,7 @@ fn run() -> Result<bool, sensel::SenselError> {
 
     scanning_device.set_led_array(&vec![0; scanning_device.get_info().num_leds])?;
 
-    let device = scanning_device.stop_scanning()?;
+    let device = scanning_device.stop_scanning().map_err(|(err, _)| err)?;
 
     let _ = device;
 

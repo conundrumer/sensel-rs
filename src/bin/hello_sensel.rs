@@ -2,8 +2,6 @@ extern crate sensel;
 
 use std::io::stdin;
 
-use sensel::device::Device;
-
 fn main() {
     let mut input = String::new();
 
